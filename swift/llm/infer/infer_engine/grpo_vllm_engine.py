@@ -8,14 +8,18 @@ from packaging import version
 
 from swift.llm import InferRequest, Template, VllmEngine, get_model_tokenizer
 from swift.plugin import Metric
-from ..protocol import ChatCompletionResponse, ChatCompletionStreamResponse, RequestConfig
+from ..protocol import (
+    ChatCompletionResponse,
+    ChatCompletionStreamResponse,
+    RequestConfig,
+)
 from .patch import patch_auto_config, patch_auto_tokenizer
 from .utils import AdapterRequest
 
 try:
     # After setting the environment variables, import vllm. This way of writing allows lint to pass.
-    os.environ['VLLM_WORKER_MULTIPROC_METHOD'] = 'spawn'
-    os.environ['VLLM_ENGINE_ITERATION_TIMEOUT_S'] = '3600'
+    os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+    os.environ["VLLM_ENGINE_ITERATION_TIMEOUT_S"] = "3600"
     import vllm
     from vllm import AsyncEngineArgs, AsyncLLMEngine, SamplingParams, EngineArgs, LLM
 except Exception:
@@ -43,7 +47,7 @@ class GRPOVllmEngine(VllmEngine):
         disable_custom_all_reduce: bool = False,
         enforce_eager: bool = False,
         limit_mm_per_prompt: Optional[Dict[str, Any]] = None,
-        device: str = 'auto',
+        device: str = "auto",
         # lora
         enable_lora: bool = False,
         max_loras: int = 1,
@@ -63,9 +67,12 @@ class GRPOVllmEngine(VllmEngine):
             model_type=model_type,
             use_hf=use_hf,
             hub_token=hub_token,
-            revision=revision)[1]
+            revision=revision,
+        )[1]
         self._post_init()
-
+        print(
+            f"disable_custom_all_reduce: {disable_custom_all_reduce}, max_num_seqs={max_num_seqs}\n\n"
+        )
         self._prepare_engine_kwargs(
             gpu_memory_utilization=gpu_memory_utilization,
             tensor_parallel_size=tensor_parallel_size,
@@ -109,32 +116,45 @@ class GRPOVllmEngine(VllmEngine):
         request_config = deepcopy(request_config or RequestConfig())
         if template is None:
             template = self.default_template
-        template.set_mode('vllm')
+        template.set_mode("vllm")
         batched_inputs, error_list = self._batch_encode(
-            infer_requests, template=template, strict=getattr(self, 'strict', True))
+            infer_requests, template=template, strict=getattr(self, "strict", True)
+        )
         self.set_default_max_tokens(request_config, batched_inputs)
 
         prompts = []
         for inputs in batched_inputs:
-            llm_inputs = {'prompt_token_ids': inputs['input_ids']}
+            llm_inputs = {"prompt_token_ids": inputs["input_ids"]}
             mm_data = {}
-            for key in ['images', 'audios', 'videos']:
+            for key in ["images", "audios", "videos"]:
                 media_data = inputs.get(key) or []
                 if media_data:
-                    if version.parse(vllm.__version__) < version.parse('0.6'):
-                        assert len(media_data) == 1, (
-                            f'The current version of vllm only supports single {key}. Please upgrade to vllm >= 0.6.0')
-                        mm_data = {key.rstrip('s'): media_data[0]}
+                    if version.parse(vllm.__version__) < version.parse("0.6"):
+                        assert (
+                            len(media_data) == 1
+                        ), f"The current version of vllm only supports single {key}. Please upgrade to vllm >= 0.6.0"
+                        mm_data = {key.rstrip("s"): media_data[0]}
                     else:
-                        mm_data = {key.rstrip('s'): media_data[0] if len(media_data) == 1 else media_data}
+                        mm_data = {
+                            key.rstrip("s"): (
+                                media_data[0] if len(media_data) == 1 else media_data
+                            )
+                        }
             if mm_data:
-                llm_inputs['multi_modal_data'] = mm_data
+                llm_inputs["multi_modal_data"] = mm_data
             prompts.append(llm_inputs)
 
         generation_configs = []
         for _ in prompts:
             generation_config = self._prepare_generation_config(request_config)
-            self._add_stop_words(generation_config, request_config, template.template_meta)
+            self._add_stop_words(
+                generation_config, request_config, template.template_meta
+            )
             generation_configs.append(generation_config)
         outputs = self.engine.generate(prompts, generation_configs)
-        return [self._create_chat_completion_response(result, template, generation_config, '') for result in outputs]
+        return [
+            self._create_chat_completion_response(
+                result, template, generation_config, ""
+            )
+            for result in outputs
+        ]
