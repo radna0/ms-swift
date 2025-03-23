@@ -262,7 +262,7 @@ class MathAccuracy(ORM):
             # We require the answer to be provided in correct latex (no malformed operators)
             answer_parsed = extract_boxed_text(content)
             try:
-                answer_parsed = str(int(answer_parsed))
+                answer_parsed = str(abs(int(answer_parsed)))
             except:
                 pass
             # Reward 1 if the content is the same as the ground truth, 0 otherwise
