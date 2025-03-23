@@ -232,6 +232,20 @@ class MathORM(ORM):
         return rewards
 
 
+import re
+
+def extract_boxed_text(text):
+    pattern = r"oxed{(.*?)}"
+    matches = re.findall(pattern, text)
+    if not matches:
+        return ""
+    for match in matches[::-1]:
+        if match != "":
+            return match
+    return ""
+
+
+
 class MathAccuracy(ORM):
 
     def __init__(self):
@@ -244,33 +258,12 @@ class MathAccuracy(ORM):
         from math_verify import LatexExtractionConfig, parse, verify
         rewards = []
         for content, sol in zip(completions, solution):
-            gold_parsed = parse(sol, extraction_mode='first_match', extraction_config=[LatexExtractionConfig()])
-            if len(gold_parsed) != 0:
-                # We require the answer to be provided in correct latex (no malformed operators)
-                answer_parsed = parse(
-                    content,
-                    extraction_config=[
-                        LatexExtractionConfig(
-                            normalization_config=NormalizationConfig(
-                                nits=False,
-                                malformed_operators=False,
-                                basic_latex=True,
-                                equations=True,
-                                boxed=True,
-                                units=True,
-                            ),
-                            # Ensures that boxed is tried first
-                            boxed_match_priority=0,
-                            try_extract_without_anchor=False,
-                        )
-                    ],
-                    extraction_mode='first_match',
-                )
-                # Reward 1 if the content is the same as the ground truth, 0 otherwise
-                reward = float(verify(answer_parsed, gold_parsed))
-            else:
-                # If the gold solution is not parseable, we reward 1 to skip this example
-                reward = 1.0
+            gold_parsed = int(sol)
+            # We require the answer to be provided in correct latex (no malformed operators)
+            answer_parsed = int(extract_boxed_text(content))
+            print(f"gold_parsed: {gold_parsed}, extract_boxed_text: {answer_parsed}, content: {content[0:50}")
+            # Reward 1 if the content is the same as the ground truth, 0 otherwise
+            reward = float(verify(answer_parsed, gold_parsed))
             rewards.append(reward)
         return rewards
 
