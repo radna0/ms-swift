@@ -261,6 +261,10 @@ class MathAccuracy(ORM):
             gold_parsed = sol
             # We require the answer to be provided in correct latex (no malformed operators)
             answer_parsed = extract_boxed_text(content)
+            try:
+                answer_parsed = str(int(answer_parsed))
+            except:
+                pass
             # Reward 1 if the content is the same as the ground truth, 0 otherwise
             reward = float(verify(answer_parsed, gold_parsed))
             print(f"gold_parsed: {gold_parsed}, extract_boxed_text: {answer_parsed}, reward: {reward}, content: {content[0:50]}")
