@@ -258,9 +258,9 @@ class MathAccuracy(ORM):
         from math_verify import LatexExtractionConfig, parse, verify
         rewards = []
         for content, sol in zip(completions, solution):
-            gold_parsed = int(sol)
+            gold_parsed = sol
             # We require the answer to be provided in correct latex (no malformed operators)
-            answer_parsed = int(extract_boxed_text(content))
+            answer_parsed = extract_boxed_text(content)
             print(f"gold_parsed: {gold_parsed}, extract_boxed_text: {answer_parsed}, content: {content[0:50}")
             # Reward 1 if the content is the same as the ground truth, 0 otherwise
             reward = float(verify(answer_parsed, gold_parsed))
